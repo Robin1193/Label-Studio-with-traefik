@@ -1,0 +1,44 @@
+services:
+  labelstudio:
+    image: heartexlabs/label-studio:latest
+    restart: unless-stopped
+    # Label Studio runs on 8080 in the container.
+    # The container user is UID 1001; ensure the volume dir perms match.
+    environment:
+      # Set to your public URL so links/callbacks are correct:
+      LABEL_STUDIO_HOST: "https://labelstudio.example.invalid"
+      CSRF_TRUSTED_ORIGINS: "https://labelstudio.example.invalid"
+
+      LABEL_STUDIO_USERNAME: ${LS_USERNAME}
+      LABEL_STUDIO_PASSWORD: ${LS_PASSWORD}
+      # optional but handy if you’ll use the API
+      # - LABEL_STUDIO_USER_TOKEN: ${LS_USER_TOKEN}
+
+      # 2) Block self-registration (only invited users can sign up;
+      # if you never send invites, only the account above can be used)
+      LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
+
+      # (recommended hardening)
+      SSRF_PROTECTION_ENABLED: "true"
+    volumes:
+      # Make directory only available for user and group 1001 and give permission 0700 --> User 1001 should not exist on your server
+      # sudo chown 1001:1001 label-studio
+      # sudo chmod 0700 label-studio
+      # But i hope label studio will fix this, that you don't need a specific user for label studio
+      - ./label-studio:/label-studio/data
+    networks:
+      - traefik-servicenet
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.labelstudio.rule=Host(`labelstudio.example.invalid`)"
+      - "traefik.http.routers.labelstudio.entrypoints=web-secure"
+      - "traefik.http.routers.labelstudio.tls=true"
+      - "traefik.http.routers.labelstudio.tls.certresolver=tlschallenge"
+      - "traefik.http.routers.labelstudio.middlewares=secHeaders@file"
+      - "traefik.http.services.labelstudio.loadbalancer.server.port=8080"
+
+networks:
+  traefik-servicenet:
+    external: true
+    name: traefik-servicenet
+
